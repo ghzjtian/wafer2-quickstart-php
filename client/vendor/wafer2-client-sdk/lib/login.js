@@ -24,7 +24,10 @@ var LoginError = (function () {
  */
 var getWxLoginResult = function getLoginCode(callback) {
     wx.login({
+      
         success: function (loginResult) {
+          //小程序登录:  https://developers.weixin.qq.com/miniprogram/dev/api/api-login.html#wxloginobject
+          console.log("success,code:" + loginResult.code );
             wx.getUserInfo({
                 success: function (userResult) {
                     callback(null, {
@@ -44,6 +47,7 @@ var getWxLoginResult = function getLoginCode(callback) {
         },
 
         fail: function (loginError) {
+          console.log("fail");
             var error = new LoginError(constants.ERR_WX_LOGIN_FAILED, '微信登录失败，请检查网络状态');
             error.detail = loginError;
             callback(error, null);
@@ -82,7 +86,8 @@ var login = function login(options) {
             options.fail(wxLoginError);
             return;
         }
-        
+        console.log('getWxLoginResult success ! ');
+        //用户信息对象，不包含 openid 等敏感信息
         var userInfo = wxLoginResult.userInfo;
 
         // 构造请求头，包含 code、encryptedData 和 iv
@@ -95,17 +100,26 @@ var login = function login(options) {
         header[constants.WX_HEADER_ENCRYPTED_DATA] = encryptedData;
         header[constants.WX_HEADER_IV] = iv;
 
-        // 请求服务器登录地址，获得会话信息
+//https://developers.weixin.qq.com/miniprogram/dev/api/api-login.html
+        // 小程序调用wx.login() 获取 临时登录凭证code ，并回传到开发者服务器
         wx.request({
             url: options.loginUrl,
             header: header,
             method: options.method,
             data: options.data,
             success: function (result) {
+
+              console.log('success,options.loginUrl:' + options.loginUrl);
+              console.log('header,1:' + header[constants.WX_HEADER_CODE] +" 2:"+ header[constants.WX_HEADER_ENCRYPTED_DATA] +" 3:"+ header[constants.WX_HEADER_IV]);
+              console.log('method:' + options.method);
+              console.log('data:' + options.data);
+
+
                 var data = result.data;
 
                 // 成功地响应会话信息
                 if (data && data.code === 0 && data.data.skey) {
+                  console.log('成功地响应会话信息');
                     var res = data.data
                     if (res.userinfo) {
                         Session.set(res.skey);
@@ -118,6 +132,7 @@ var login = function login(options) {
 
                 // 没有正确响应会话信息
                 } else {
+                  console.log('没有正确响应会话信息');
                     var noSessionError = new LoginError(constants.ERR_LOGIN_SESSION_NOT_RECEIVED, JSON.stringify(data));
                     options.fail(noSessionError);
                 }
